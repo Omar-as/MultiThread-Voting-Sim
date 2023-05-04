@@ -1,6 +1,8 @@
 #include "sleep.hh"
 #include <argparse/argparse.hpp>
 
+using namespace std;
+
 int main(int argc, char **argv) { 
     argparse::ArgumentParser program("voting simulator");
     program
@@ -26,8 +28,8 @@ int main(int argc, char **argv) {
       program.parse_args(argc, argv);
     }
     catch (const std::runtime_error& err) {
-      std::cerr << err.what() << std::endl;
-      std::cerr << program;
+      cerr << err.what() << std::endl;
+      cerr << program;
       return 1;
     }
 
@@ -35,11 +37,11 @@ int main(int argc, char **argv) {
     auto probability        = program.get<float>("-p");
     auto number_of_stations = program.get<int>("-c");
 
-    std::cout << "time: " << time << "\n";
+    cout << "time: " << time << "\n";
 
-    std::cout << "prob: " << probability << "\n";
+    cout << "prob: " << probability << "\n";
 
-    std::cout << "stations: " << number_of_stations << "\n";
+    cout << "stations: " << number_of_stations << "\n";
 
 
     return 0;

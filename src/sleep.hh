@@ -1,7 +1,7 @@
 #ifndef SLEEP_HH
 #define SLEEP_HH
 #include <sys/time.h>
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <pthread.h>
 

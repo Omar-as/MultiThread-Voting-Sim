@@ -1,6 +1,6 @@
 CC := g++
 
 all:
-	$(CC) -Wall main.cpp -o main
+	$(CC) -Wall -Wextra main.cpp -o main
 clean:
 	rm main
