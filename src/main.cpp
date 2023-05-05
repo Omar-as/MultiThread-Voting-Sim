@@ -47,8 +47,9 @@ map<int,custom::Station> stations;
 /* Function Declarations */
 /*************************/
 
-int get_least_crowded_station(int number_of_stations);
+int get_least_crowded_station( int number_of_stations );
 void* create_voters( void* args_ptr );
+void* start_station( void* args_ptr );
 
 /******************************************************************************/
 
@@ -57,13 +58,6 @@ void* create_voters( void* args_ptr );
 /*********/
 
 int main(int argc, char **argv) { 
-
-    // Canditates
-    const map<string, float> Canditates = {
-        {"Mary", 0.40},
-        {"John", 0.15},
-        {"Anna", 0.45}
-    };
 
     // Pareser initializer
     argparse::ArgumentParser program("voting simulator");
@@ -87,6 +81,13 @@ int main(int argc, char **argv) {
         .default_value(1)
         .scan<'i', int>();
 
+    program
+        .add_argument("-n")
+        .help("The nth second to start")
+        .default_value(0)
+        .scan<'i', int>();
+
+
     // Parse arguments 
     try {
       program.parse_args(argc, argv);
@@ -99,6 +100,7 @@ int main(int argc, char **argv) {
 
     // Parser Constants
     auto time               = program.get<int>("-t");
+    auto nth_second         = program.get<int>("-n");
     auto probability        = program.get<float>("-p");
     auto number_of_stations = program.get<int>("-c");
 
@@ -118,22 +120,31 @@ int main(int argc, char **argv) {
 
 
     for (int i = 0; i < number_of_stations; i++) {
-        pair<int,custom::Station> st =  {i+1, custom::Station()};
+        pair<int,custom::Station> st =  { i+1, custom::Station() };
         stations.insert(st); 
     }
 
 
-    // Thread variable
+    // Thread variables
     pthread_t creation_thread;
+    vector<pthread_t> station_threads(number_of_stations);
 
     // Set values of the struct
-    custom::args_struct args = { probability, time, number_of_stations };
+    custom::voter_args_struct args = { probability, time, number_of_stations };
 
-    // Send values to create voters
+    // create the thread that creates voters
     pthread_create( &creation_thread, NULL, create_voters, (void*) &args );
+
+    for (int i = 0; i < number_of_stations; i++) {
+        custom::station_args_struct station_args = { time, i+1, nth_second };
+        pthread_create( &station_threads[i], NULL, start_station, (void*) &station_args);
+    }
 
     // Join Threads
     pthread_join(creation_thread, NULL);
+    for (int i = 0; i < number_of_stations; i++) {
+        pthread_join(station_threads[i], NULL);
+    }
 
     return EXIT_SUCCESS;
 }
@@ -169,10 +180,10 @@ void* create_voters( void* args_ptr )
     int     sim_time;
     int     number_of_stations;
 
-    auto args = *(custom::args_struct *) args_ptr;
+    auto args = *(custom::voter_args_struct *) args_ptr;
     probability         = args.probability;
     sim_time            = args.sim_time;
-    number_of_stations  = args.station_number; 
+    number_of_stations  = args.number_of_stations;
 
     // Time per voter 
     const auto t = 1;
@@ -199,12 +210,17 @@ void* create_voters( void* args_ptr )
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
+
+        pthread_mutex_lock (station.get_mutex());
+
         if ( random_number <= probability ) {
             station.add_normal(ticket_no);
         }
         else { 
             station.add_special(ticket_no);
         }
+
+        pthread_mutex_unlock (station.get_mutex());
 
         ticket_no++;
 
@@ -239,6 +255,106 @@ void* create_voters( void* args_ptr )
     }
 
     return EXIT_SUCCESS;
+}
+
+string vote(){
+    // Candidates
+    const map<string, pair<float,float>> Candidates = {
+        {"Mary", {0.0, 0.40}},
+        {"John", {0.40, 0.55}},
+        {"Anna", {0.55, 1.0}}
+    };
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_real_distribution<> dis(0, 1);
+
+    double random_number = dis(gen);
+    for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
+        if(random_number >= it->second.first && random_number <= it->second.second){
+            return it->first;
+        }
+    }
+    return NULL;
+}
+
+void* start_station( void* args_ptr ) {
+    // variables from struct
+    int sim_time;
+    int station_number;
+    int n;
+
+    auto args      = *(custom::station_args_struct *) args_ptr;
+    sim_time       = args.sim_time;
+    station_number = args.station_number;
+    n              = args.nth_second;
+
+
+    // Simulation timer
+    auto t = 1;
+    auto station = stations[ station_number ];
+    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto end_sim_time =  static_cast<int>(starting_time) + sim_time;
+    int voter;
+
+    while(current_time < end_sim_time) {
+        
+        auto normal  = station.get_normal();
+        auto special = station.get_special();
+
+        cout << "Ordinary Voters:" << endl;
+        while (!normal.empty()) {
+            cout << " " << normal.front();
+            normal.pop();
+        }
+
+        cout << endl << "Special Voters:" << endl;
+        while (!special.empty()) {
+            cout << " " << special.front();
+            special.pop();
+        }
+        cout << endl;
+        /* cout << station.get_normal().size() << endl; */
+        /* cout << station.get_special().size() << endl; */
+
+        if(station.normal_waiting() <= 0 && station.special_waiting() <= 0) {
+            current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            continue;
+        }
+
+        pthread_mutex_lock (station.get_mutex());
+
+        if(station.normal_waiting() <= 0 || (station.normal_waiting() < 5 && station.special_waiting() <= 0)) {
+            voter = station.pop_special();
+        }
+
+        else if(station.special_waiting() <= 0) {
+            voter = station.pop_normal();
+        }
+
+        else {
+            station.get_normal().front() > station.get_special().front() ? station.pop_special() : station.pop_normal();
+        }
+
+        pthread_mutex_lock (station.get_mutex());
+        string vote_res = vote();
+
+        station.increment_vote( vote_res );
+
+        if (current_time - starting_time >= n) {
+            auto total_votes = station.get_total_votes();
+            cout << "Station : " << station_number << endl;
+            cout << "Mary: " << total_votes["Mary"] << "John: "  <<  total_votes["John"] << "Anna: " << total_votes["Anna"] <<  endl;
+        }
+        cout << (current_time - starting_time)  << " "  << n << endl;
+
+
+        custom::pthread_sleep(2 * t);
+        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    }
+    cout << "exiting while" << endl;
+
+    return 0;
 }
 
 /******************************************************************************/
