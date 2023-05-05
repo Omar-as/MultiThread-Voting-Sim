@@ -26,7 +26,7 @@ using namespace std;
 /* Global State */
 /****************/
 
-// Voter struct
+// Voter creation arguments struct
 struct args_struct {
     float probability;
     int sim_time;
@@ -56,8 +56,10 @@ int main(int argc, char **argv) {
         {"Anna", 0.45}
     };
 
-    // Pareser
+    // Pareser initializer
     argparse::ArgumentParser program("voting simulator");
+
+    // Adding flags to parse
     program
         .add_argument("-t")
         .required()
@@ -76,7 +78,7 @@ int main(int argc, char **argv) {
         .default_value(1)
         .scan<'i', int>();
 
-    // Error Handling
+    // Parse arguments 
     try {
       program.parse_args(argc, argv);
     }
@@ -86,7 +88,7 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    // Parser Constants 
+    // Parser Constants
     auto time               = program.get<int>("-t");
     auto probability        = program.get<float>("-p");
     auto number_of_stations = program.get<int>("-c");
@@ -105,10 +107,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // Thread Creation
+    // Thread variable
     pthread_t creation_thread;
 
-    // Add values to struct
+    // Set values of the struct
     args_struct args = { probability, time };
 
     // Send values to create voters
@@ -128,7 +130,7 @@ int main(int argc, char **argv) {
 
 void* create_voters( void* args_ptr )
 {
-    // Constants from struct
+    // variables from struct
     float probability;
     int sim_time;
     int station_number;
@@ -138,17 +140,17 @@ void* create_voters( void* args_ptr )
     sim_time = args.sim_time;
     /* station_number = args.station_number; */
 
-    // Voter creation time
+    // Time per voter 
     const auto t = 1;
 
-    // Ticket Counter 
+    // Ticket Counter
     auto next_ticket = 1;
 
     // Voters "Queues"
     vector<int> ordinary_voters = {};
     vector<int> special_voters = {};
 
-    // Simulation timers
+    // Simulation timer
     auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time =  static_cast<int>(current_time) + sim_time;
 
