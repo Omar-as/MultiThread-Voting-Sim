@@ -265,22 +265,26 @@ void* create_voters( void* args_ptr )
 }
 
 string vote(){
-    // Candidates
+    // Candidates with CDF interval
     const map<string, pair<float,float>> Candidates = {
-        {"Mary", {0.0, 0.40}},
+        {"Mary", {0.00, 0.40}},
         {"John", {0.40, 0.55}},
-        {"Anna", {0.55, 1.0}}
+        {"Anna", {0.55, 1.00}}
     };
+    // random generator to generate a number between 0 and 1
     random_device rd;
     mt19937 gen(rd());
     uniform_real_distribution<> dis(0, 1);
 
     double random_number = dis(gen);
+    // for each candidate check if the random number is within the candidates interval
+    // if so return the name of the candidate
     for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
         if(random_number >= it->second.first && random_number <= it->second.second){
             return it->first;
         }
     }
+    // the return statement should not be reached
     return NULL;
 }
 
