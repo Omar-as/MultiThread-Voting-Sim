@@ -23,9 +23,15 @@ namespace custom {
         public:
 
             Station(){
+                mutex = new pthread_mutex_t;
                 if(pthread_mutex_init(mutex,NULL)) {
                     cout << "mutex initialization failed" << endl;
                 }
+            }
+
+            ~Station() {
+                pthread_mutex_destroy(mutex);
+                delete mutex;
             }
 
 
