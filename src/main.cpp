@@ -120,7 +120,6 @@ int main(int argc, char **argv) {
 
 
     for (int i = 0; i < number_of_stations; i++) {
-
         custom::Station* station = new custom::Station();
         pair<int,custom::Station*> st =  { i+1, station };
         stations.insert(st); 
@@ -190,7 +189,7 @@ void* create_voters( void* args_ptr )
     sim_time            = args.sim_time;
     number_of_stations  = args.number_of_stations;
 
-    // Time per voter 
+    // Time per voter
     const auto t = 1;
 
     // Ticket Counter
@@ -215,17 +214,7 @@ void* create_voters( void* args_ptr )
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
-
-        pthread_mutex_lock (station->get_mutex());
-
-        if ( random_number <= probability ) {
-            station->add_normal(ticket_no);
-        }
-        else { 
-            station->add_special(ticket_no);
-        }
-
-        pthread_mutex_unlock (station->get_mutex());
+        station->add_voter(ticket_no,(random_number <= probability) ? "normal" : "special");
 
         ticket_no++;
 
@@ -233,33 +222,6 @@ void* create_voters( void* args_ptr )
         custom::pthread_sleep(t);
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
-
-
-    /* for (auto it = stations.begin(); it != stations.end(); it++) { */
-
-    /*     cout << "Station Number:" << it->first << endl; */
-
-    /*     auto station = it->second; */
-
-    /*     pthread_mutex_lock (station->get_mutex()); */
-    /*     auto normal  = station->get_normal(); */
-    /*     auto special = station->get_special(); */
-
-    /*     cout << "Ordinary Voters:" << endl; */
-    /*     while (!normal.empty()) { */
-    /*         cout << " " << normal.front(); */
-    /*         normal.pop(); */
-    /*     } */
-
-    /*     cout << endl << "Special Voters:" << endl; */
-    /*     while (!special.empty()) { */
-    /*         cout << " " << special.front(); */
-    /*         special.pop(); */
-    /*     } */
-    /*     cout << endl; */
-    /*     pthread_mutex_unlock (station->get_mutex()); */
-
-    /* } */
 
     return EXIT_SUCCESS;
 }
@@ -287,6 +249,31 @@ string vote(){
     // the return statement should not be reached
     return NULL;
 }
+void log(custom::Station* station, int station_number, int current_time, int starting_time){
+    auto total_votes = station->get_total_votes();
+    auto ordinary_queue = station->get_normal();
+    auto special_queue = station->get_special();
+    auto curr_time = (current_time - starting_time);
+    /* cout << "Special is empty: " << special_queue.empty() << endl; */
+    cout << "At " << curr_time << " sec, polling station " << station_number << ", elderly/pregnant:";
+    while(!special_queue.empty()) {
+        cout << special_queue.front().first;
+        special_queue.pop();
+        if (!special_queue.empty()) cout << ", ";
+    }
+    /* cout << endl << "Ordinary is empty: " << ordinary_queue.empty() << endl; */
+    cout << endl << "At " << curr_time << " sec, polling station " << station_number << ", ordinary:";
+    while(!ordinary_queue.empty()) {
+        cout << ordinary_queue.front().first;
+        ordinary_queue.pop();
+        if (!ordinary_queue.empty()) cout << ", ";
+    }
+    cout << endl;
+
+    cout << "Station : " << station_number << endl;
+    cout << "Mary: " << total_votes["Mary"] << " John: "  <<  total_votes["John"] << " Anna: " << total_votes["Anna"] <<  endl;
+
+}
 
 void* start_station( void* args_ptr ) {
     // variables from struct
@@ -304,21 +291,25 @@ void* start_station( void* args_ptr ) {
     // Simulation timer
     auto t = 1;
     auto station = stations[ station_number ];
-    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto current_time =  chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time =  static_cast<int>(starting_time) + sim_time;
-    int voter;
+    pair<int, pthread_t*> voter;
 
     while(current_time < end_sim_time) {
+
+        // logging starting from the nth second
+        if (current_time - starting_time >= n) {
+            log(station, station_number, current_time, starting_time);
+        }
 
         // checks if there are any voters waiting to vote
         if(station->normal_waiting() <= 0 && station->special_waiting() <= 0) {
             current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+
+            custom::pthread_sleep(t);
             continue;
         }
-
-        // aquiring lock for reading and manipulating queues
-        pthread_mutex_lock (station->get_mutex());
 
         // checks if we have have less than 5 ordinary voters waiting and at least 1 special voter
         // if so it gives the special voter priority to vote
@@ -335,25 +326,15 @@ void* start_station( void* args_ptr ) {
         // if none of the above conditions hold we check the tickets of the first ordinary voter and the first special voter
         // and let the one with the lowest ticket number vote
         else {
-            station->get_normal().front() > station->get_special().front() ? station->pop_special() : station->pop_normal();
+            voter = station->get_normal().front() > station->get_special().front() ? station->pop_special() : station->pop_normal();
         }
 
-        // releasing lock
-        pthread_mutex_unlock (station->get_mutex());
 
         // makes the voter vote and we get their voting result
         string vote_res = vote();
 
         // increment the total number of votes for the given result
         station->increment_vote( vote_res );
-
-        // logging starting from the nth second
-        if (current_time - starting_time >= n) {
-            auto total_votes = station->get_total_votes();
-            cout << "Station : " << station_number << endl;
-            cout << "Mary: " << total_votes["Mary"] << " John: "  <<  total_votes["John"] << " Anna: " << total_votes["Anna"] <<  endl;
-        }
-
 
         // sleep the thread for 2t
         custom::pthread_sleep(2 * t);

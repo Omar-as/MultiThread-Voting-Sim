@@ -9,16 +9,23 @@
 using namespace std;
 
 namespace custom {
+    void* vote_thread_func(void* args){
 
+        return 0;
+    }
     class Station {
 
         private:
 
-            queue<int> normal;
-            queue<int> special;
-            queue<int> mechanic;
+            queue<pair<int, pthread_t*>> normal;
+            queue<pair<int, pthread_t*>> special;
+            queue<pair<int, pthread_t*>> mechanic;
 
             pthread_mutex_t* mutex;
+            pthread_mutex_t* mutex_vote;
+            pthread_cond_t* cond_vote;
+
+
 
         public:
 
@@ -27,11 +34,23 @@ namespace custom {
                 if(pthread_mutex_init(mutex,NULL)) {
                     cout << "mutex initialization failed" << endl;
                 }
+                mutex_vote = new pthread_mutex_t;
+                if(pthread_mutex_init(mutex_vote,NULL)) {
+                    cout << "mutex_vote initialization failed" << endl;
+                }
+                cond_vote = new pthread_cond_t;
+                if(pthread_cond_init(cond_vote,NULL)) {
+                    cout << "cond_vote initialization failed" << endl;
+                }
             }
 
             ~Station() {
                 pthread_mutex_destroy(mutex);
                 delete mutex;
+                pthread_mutex_destroy(mutex_vote);
+                delete mutex_vote;
+                pthread_cond_destroy(cond_vote);
+                delete cond_vote;
             }
 
 
@@ -49,39 +68,99 @@ namespace custom {
 
             int get_total_waiting() { return normal_waiting() + special_waiting() + mechanic_waiting(); }
 
-            void add_normal ( int ticket_no )    { normal.push(ticket_no);   }
+            void add_voter ( int ticket_no, string queue_name ) {
 
-            void add_special ( int ticket_no )   { special.push(ticket_no);  }
+                auto lock = get_mutex();
 
-            void add_mechanic ( int ticket_no )  { mechanic.push(ticket_no); }
+                // aquiring lock for pushing a mechanic into the queue
+                pthread_mutex_lock (lock);
 
-            void increment_vote ( string candidate ) { total_votes[candidate]++; }
+                pthread_t voter_thread;
 
-            queue<int> get_normal()      { return normal;   }
+                pthread_create( &voter_thread, NULL, vote_thread_func, NULL );
+                pair<int, pthread_t*> p = {ticket_no, &voter_thread};
 
-            queue<int> get_special()     { return special;  }
+                if(queue_name == "normal") {
+                    normal.push(p);
+                }
+                else if(queue_name == "special") {
+                    normal.push(p);
+                } 
+                else if (queue_name == "mechanic"){
+                    mechanic.push(p); 
+                }
 
-            queue<int> get_mechanic()    { return mechanic; }
+                // release lock
+                pthread_mutex_unlock (lock);
+            }
 
-            pthread_mutex_t* get_mutex() { return mutex;    }
+            void increment_vote ( string candidate ) {
+                auto lock = get_mutex();
+
+                // aquiring lock for incrementing the vote count
+                pthread_mutex_lock (lock);
+
+                total_votes[candidate]++; 
+
+                // release lock
+                pthread_mutex_unlock (lock);
+            }
+
+            queue<pair<int,pthread_t*>> get_normal()      { return normal;   }
+
+            queue<pair<int,pthread_t*>> get_special()     { return special;  }
+
+            queue<pair<int,pthread_t*>> get_mechanic()    { return mechanic; }
+
+            pthread_mutex_t* get_mutex() { return mutex; }
 
             map<string, int> get_total_votes() { return total_votes; }
 
-            int pop_normal() { 
-                int val = normal.front();
+            pair<int,pthread_t*> pop_normal() {
+
+                auto lock = get_mutex();
+
+                // aquiring lock for poping from the queue
+                pthread_mutex_lock (lock);
+
+                auto val = normal.front();
                 normal.pop();
-                return val;   
+
+                // release lock
+                pthread_mutex_unlock (lock);
+
+                return val;
             }
             
-            int pop_special()    { 
-                int val = special.front();
+            pair<int,pthread_t*> pop_special() {
+
+                auto lock = get_mutex();
+
+                // aquiring lock for poping from the queue
+                pthread_mutex_lock (lock);
+
+                auto val = special.front();
                 special.pop();
+
+                // release lock
+                pthread_mutex_unlock (lock);
+
                 return val;
             }
 
-            int pop_mechanic()   {
-                int val = mechanic.front();
+            pair<int,pthread_t*> pop_mechanic() {
+
+                auto lock = get_mutex();
+
+                // aquiring lock for poping from the queue
+                pthread_mutex_lock (lock);
+
+                auto val = mechanic.front();
                 mechanic.pop();
+
+                // release lock
+                pthread_mutex_unlock (lock);
+
                 return val;
             }
     };
