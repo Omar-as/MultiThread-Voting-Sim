@@ -306,31 +306,44 @@ void* start_station( void* args_ptr ) {
     int voter;
 
     while(current_time < end_sim_time) {
-        
+
+        // checks if there are any voters waiting to vote
         if(station->normal_waiting() <= 0 && station->special_waiting() <= 0) {
             current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
             continue;
         }
 
+        // aquiring lock for reading and manipulating queues
         pthread_mutex_lock (station->get_mutex());
 
-        if(station->normal_waiting() <= 0 || (station->normal_waiting() < 5 && station->special_waiting() <= 0)) {
+        // checks if we have have less than 5 ordinary voters waiting and at least 1 special voter
+        // if so it gives the special voter priority to vote
+        if(station->normal_waiting() < 5 && station->special_waiting() > 0) {
             voter = station->pop_special();
         }
 
+        // checks if there are no special voters waiting
+        // if so we let an ordinary voter vote
         else if(station->special_waiting() <= 0) {
             voter = station->pop_normal();
         }
 
+        // if none of the above conditions hold we check the tickets of the first ordinary voter and the first special voter
+        // and let the one with the lowest ticket number vote
         else {
             station->get_normal().front() > station->get_special().front() ? station->pop_special() : station->pop_normal();
         }
 
+        // releasing lock
         pthread_mutex_unlock (station->get_mutex());
+
+        // makes the voter vote and we get their voting result
         string vote_res = vote();
 
+        // increment the total number of votes for the given result
         station->increment_vote( vote_res );
 
+        // logging starting from the nth second
         if (current_time - starting_time >= n) {
             auto total_votes = station->get_total_votes();
             cout << "Station : " << station_number << endl;
@@ -338,6 +351,7 @@ void* start_station( void* args_ptr ) {
         }
 
 
+        // sleep the thread for 2t
         custom::pthread_sleep(2 * t);
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
