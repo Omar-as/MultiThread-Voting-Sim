@@ -191,6 +191,9 @@ void* vote_thread_func(void* args_ptr) {
     while( !voter->get_ready() ){
         pthread_cond_wait(cond, lock);
     }
+    /* cout << voter->get_ticket_number() << "woke up" << endl; */
+
+    custom::pthread_sleep(2);
 
     // Candidates with CDF interval
     const map<string, pair<float,float>> Candidates = {
@@ -205,7 +208,6 @@ void* vote_thread_func(void* args_ptr) {
 
     double random_number = dis(gen);
 
-    custom::pthread_sleep(2);
     // for each candidate check if the random number is within the candidates interval
     // if so return the name of the candidate
     for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
@@ -215,6 +217,7 @@ void* vote_thread_func(void* args_ptr) {
         }
     }
 
+    voter->set_ready(false);
     pthread_mutex_unlock(lock);
 
     return 0;
@@ -257,17 +260,17 @@ void* create_voters( void* args_ptr )
         string queue = (random_number <= probability) ? "normal" : "special";
         station->add_voter(ticket_no, queue);
 
-        custom::Voter* voter;
-        if(queue == "special"){
+        custom::Voter* voter = NULL;
+        if(queue == "special") {
             voter = station->get_special().back();
         }
-        else if(queue == "normal"){
+        else if(queue == "normal") {
             voter = station->get_normal().back();
         }
-        pair<custom::Station*, custom::Voter *> args= {station, voter};
+        auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
 
         pthread_t voter_thread;
-        pthread_create( &voter_thread, NULL, vote_thread_func, &args );
+        pthread_create( &voter_thread, NULL, vote_thread_func, (void *) args );
 
         voter->set_thread(&voter_thread);
 
@@ -386,13 +389,22 @@ void* start_station( void* args_ptr ) {
 
 
         // makes the voter vote and we get their voting result
-        string vote_res = vote();
+        /* string vote_res = vote(); */
 
+        pthread_mutex_lock(voter->get_mutex());
+
+        /* cout << "signaling " << voter->get_ticket_number()  << endl; */
+
+        voter->set_ready(true);
+        pthread_cond_signal(voter->get_cond());
+        pthread_mutex_unlock(voter->get_mutex());
+
+        /* pthread_join(*voter->get_thread(), NULL); */
         // increment the total number of votes for the given result
-        station->increment_vote( vote_res );
+        /* station->increment_vote( vote_res ); */
 
         // sleep the thread for 2t
-        custom::pthread_sleep(2 * t);
+        /* custom::pthread_sleep(2 * t); */
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
