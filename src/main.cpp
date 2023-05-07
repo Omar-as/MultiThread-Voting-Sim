@@ -13,7 +13,7 @@ using namespace std;
 
 #include "custom/sleep.cpp"
 #include "custom/struct.cpp"
-/* #include "custom/voter.cpp" */
+#include "custom/voter.cpp"
 #include "custom/station.cpp"
 
 /* Other Imports */
@@ -208,13 +208,10 @@ void* create_voters( void* args_ptr )
 
         double random_number = dis(gen);
 
-        /* auto min = std::min_element(next_ticket.begin(), next_ticket.end()); */
-        /* auto least_crowded_station =  std::distance(next_ticket.begin(), min); */
-
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
-        station->add_voter(ticket_no,(random_number <= probability) ? "normal" : "special");
+        station->add_voter(ticket_no, (random_number <= probability) ? "normal" : "special");
 
         ticket_no++;
 
@@ -257,14 +254,14 @@ void log(custom::Station* station, int station_number, int current_time, int sta
     /* cout << "Special is empty: " << special_queue.empty() << endl; */
     cout << "At " << curr_time << " sec, polling station " << station_number << ", elderly/pregnant:";
     while(!special_queue.empty()) {
-        cout << special_queue.front().first;
+        cout << special_queue.front()->get_ticket_number();
         special_queue.pop();
         if (!special_queue.empty()) cout << ", ";
     }
     /* cout << endl << "Ordinary is empty: " << ordinary_queue.empty() << endl; */
     cout << endl << "At " << curr_time << " sec, polling station " << station_number << ", ordinary:";
     while(!ordinary_queue.empty()) {
-        cout << ordinary_queue.front().first;
+        cout << ordinary_queue.front()->get_ticket_number();
         ordinary_queue.pop();
         if (!ordinary_queue.empty()) cout << ", ";
     }
@@ -294,7 +291,7 @@ void* start_station( void* args_ptr ) {
     auto current_time =  chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time =  static_cast<int>(starting_time) + sim_time;
-    pair<int, pthread_t*> voter;
+    custom::Voter* voter;
 
     while(current_time < end_sim_time) {
 

@@ -5,52 +5,37 @@
 #include <map>
 #include <string>
 #include <queue>
+#include "voter.cpp"
 
 using namespace std;
 
 namespace custom {
-    void* vote_thread_func(void* args){
 
-        return 0;
-    }
     class Station {
 
         private:
 
-            queue<pair<int, pthread_t*>> normal;
-            queue<pair<int, pthread_t*>> special;
-            queue<pair<int, pthread_t*>> mechanic;
+            queue<Voter*> normal;
+            queue<Voter*> special;
+            queue<Voter*> mechanic;
 
-            pthread_mutex_t* mutex;
-            pthread_mutex_t* mutex_vote;
-            pthread_cond_t* cond_vote;
+            pthread_mutex_t* mutex_queues;
+            pthread_mutex_t* mutex_candidates;
 
 
 
         public:
 
             Station(){
-                mutex = new pthread_mutex_t;
-                if(pthread_mutex_init(mutex,NULL)) {
+                mutex_queues = new pthread_mutex_t;
+                if(pthread_mutex_init(mutex_queues,NULL)) {
                     cout << "mutex initialization failed" << endl;
-                }
-                mutex_vote = new pthread_mutex_t;
-                if(pthread_mutex_init(mutex_vote,NULL)) {
-                    cout << "mutex_vote initialization failed" << endl;
-                }
-                cond_vote = new pthread_cond_t;
-                if(pthread_cond_init(cond_vote,NULL)) {
-                    cout << "cond_vote initialization failed" << endl;
                 }
             }
 
             ~Station() {
-                pthread_mutex_destroy(mutex);
-                delete mutex;
-                pthread_mutex_destroy(mutex_vote);
-                delete mutex_vote;
-                pthread_cond_destroy(cond_vote);
-                delete cond_vote;
+                pthread_mutex_destroy(mutex_queues);
+                delete mutex_queues;
             }
 
 
@@ -75,19 +60,17 @@ namespace custom {
                 // aquiring lock for pushing a mechanic into the queue
                 pthread_mutex_lock (lock);
 
-                pthread_t voter_thread;
 
-                pthread_create( &voter_thread, NULL, vote_thread_func, NULL );
-                pair<int, pthread_t*> p = {ticket_no, &voter_thread};
+                auto voter = new Voter(ticket_no);
 
                 if(queue_name == "normal") {
-                    normal.push(p);
+                    normal.push(voter);
                 }
                 else if(queue_name == "special") {
-                    normal.push(p);
+                    special.push(voter);
                 } 
                 else if (queue_name == "mechanic"){
-                    mechanic.push(p); 
+                    mechanic.push(voter); 
                 }
 
                 // release lock
@@ -106,17 +89,17 @@ namespace custom {
                 pthread_mutex_unlock (lock);
             }
 
-            queue<pair<int,pthread_t*>> get_normal()      { return normal;   }
+            queue<Voter*> get_normal()      { return normal;   }
 
-            queue<pair<int,pthread_t*>> get_special()     { return special;  }
+            queue<Voter*> get_special()     { return special;  }
 
-            queue<pair<int,pthread_t*>> get_mechanic()    { return mechanic; }
+            queue<Voter*> get_mechanic()    { return mechanic; }
 
-            pthread_mutex_t* get_mutex() { return mutex; }
+            pthread_mutex_t* get_mutex() { return mutex_queues; }
 
             map<string, int> get_total_votes() { return total_votes; }
 
-            pair<int,pthread_t*> pop_normal() {
+            Voter* pop_normal() {
 
                 auto lock = get_mutex();
 
@@ -132,7 +115,7 @@ namespace custom {
                 return val;
             }
             
-            pair<int,pthread_t*> pop_special() {
+            Voter* pop_special() {
 
                 auto lock = get_mutex();
 
@@ -148,7 +131,7 @@ namespace custom {
                 return val;
             }
 
-            pair<int,pthread_t*> pop_mechanic() {
+            Voter* pop_mechanic() {
 
                 auto lock = get_mutex();
 
