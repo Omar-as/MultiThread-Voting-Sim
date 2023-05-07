@@ -3,19 +3,16 @@
 
 #include <iostream>
 #include <pthread.h>
-/* #include "station.cpp" */
 using namespace std;
 namespace custom {
-    void* vote_thread_func(void* args){
 
-        return 0;
-    }
     class Voter {
         private:
             pthread_mutex_t* mutex_vote;
             pthread_cond_t* cond_vote;
             pthread_t* voter_thread;
 
+            bool ready;
             int ticket_number;
         public:
             Voter(int ticket_no) {
@@ -29,9 +26,10 @@ namespace custom {
                     cout << "cond_vote initialization failed" << endl;
                 }
 
-                pthread_t voter_thread;
-                pthread_create( &voter_thread, NULL, vote_thread_func, NULL );
+                /* pthread_t voter_thread; */
+                /* pthread_create( &voter_thread, NULL, vote_thread_func, NULL ); */
                 ticket_number = ticket_no;
+                ready = false;
             }
             ~Voter() {
                 pthread_mutex_destroy(mutex_vote);
@@ -42,6 +40,18 @@ namespace custom {
             void vote(){}
             int get_ticket_number(){
                 return ticket_number;
+            }
+            pthread_mutex_t* get_mutex() {
+                return mutex_vote;
+            }
+            pthread_cond_t* get_cond() {
+                return cond_vote;
+            }
+            bool get_ready(){
+                return ready;
+            }
+            void set_thread(pthread_t* thread){
+                voter_thread = thread;
             }
     };
 }

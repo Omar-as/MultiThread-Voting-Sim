@@ -177,6 +177,49 @@ int get_least_crowded_station( int number_of_stations ) {
     return stat_number;
 }
 
+void* vote_thread_func(void* args_ptr) {
+
+    auto args = (pair<custom::Station*, custom::Voter *>*) args_ptr;
+    auto voter = args->second;
+    auto station = args->first;
+
+
+    auto lock = voter->get_mutex();
+    auto cond = voter->get_cond();
+    pthread_mutex_lock(lock);
+
+    while( !voter->get_ready() ){
+        pthread_cond_wait(cond, lock);
+    }
+
+    // Candidates with CDF interval
+    const map<string, pair<float,float>> Candidates = {
+        {"Mary", {0.00, 0.40}},
+        {"John", {0.40, 0.55}},
+        {"Anna", {0.55, 1.00}}
+    };
+    // random generator to generate a number between 0 and 1
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_real_distribution<> dis(0, 1);
+
+    double random_number = dis(gen);
+
+    custom::pthread_sleep(2);
+    // for each candidate check if the random number is within the candidates interval
+    // if so return the name of the candidate
+    for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
+        if(random_number >= it->second.first && random_number <= it->second.second){
+             station->increment_vote( it->first );
+             break;
+        }
+    }
+
+    pthread_mutex_unlock(lock);
+
+    return 0;
+}
+
 void* create_voters( void* args_ptr )
 {
     // variables from struct
@@ -211,7 +254,22 @@ void* create_voters( void* args_ptr )
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
-        station->add_voter(ticket_no, (random_number <= probability) ? "normal" : "special");
+        string queue = (random_number <= probability) ? "normal" : "special";
+        station->add_voter(ticket_no, queue);
+
+        custom::Voter* voter;
+        if(queue == "special"){
+            voter = station->get_special().back();
+        }
+        else if(queue == "normal"){
+            voter = station->get_normal().back();
+        }
+        pair<custom::Station*, custom::Voter *> args= {station, voter};
+
+        pthread_t voter_thread;
+        pthread_create( &voter_thread, NULL, vote_thread_func, &args );
+
+        voter->set_thread(&voter_thread);
 
         ticket_no++;
 
@@ -323,7 +381,7 @@ void* start_station( void* args_ptr ) {
         // if none of the above conditions hold we check the tickets of the first ordinary voter and the first special voter
         // and let the one with the lowest ticket number vote
         else {
-            voter = station->get_normal().front() > station->get_special().front() ? station->pop_special() : station->pop_normal();
+            voter = station->get_normal().front()->get_ticket_number() > station->get_special().front()->get_ticket_number() ? station->pop_special() : station->pop_normal();
         }
 
 
