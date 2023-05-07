@@ -185,6 +185,7 @@ void* vote_thread_func(void* args_ptr) {
 
 
     auto lock = voter->get_mutex();
+    auto lock_vote = voter->get_mutex();
     auto cond = voter->get_cond();
     pthread_mutex_lock(lock);
 
@@ -193,6 +194,9 @@ void* vote_thread_func(void* args_ptr) {
     }
     /* cout << voter->get_ticket_number() << "woke up" << endl; */
 
+    pthread_mutex_unlock(lock);
+
+    pthread_mutex_lock(lock_vote);
     custom::pthread_sleep(2);
 
     // Candidates with CDF interval
@@ -218,7 +222,7 @@ void* vote_thread_func(void* args_ptr) {
     }
 
     voter->set_ready(false);
-    pthread_mutex_unlock(lock);
+    pthread_mutex_unlock(lock_vote);
 
     return 0;
 }
@@ -272,7 +276,7 @@ void* create_voters( void* args_ptr )
         pthread_t voter_thread;
         pthread_create( &voter_thread, NULL, vote_thread_func, (void *) args );
 
-        voter->set_thread(&voter_thread);
+        voter->set_thread(voter_thread);
 
         ticket_no++;
 
@@ -284,29 +288,29 @@ void* create_voters( void* args_ptr )
     return EXIT_SUCCESS;
 }
 
-string vote(){
-    // Candidates with CDF interval
-    const map<string, pair<float,float>> Candidates = {
-        {"Mary", {0.00, 0.40}},
-        {"John", {0.40, 0.55}},
-        {"Anna", {0.55, 1.00}}
-    };
-    // random generator to generate a number between 0 and 1
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_real_distribution<> dis(0, 1);
+/* string vote(){ */
+/*     // Candidates with CDF interval */
+/*     const map<string, pair<float,float>> Candidates = { */
+/*         {"Mary", {0.00, 0.40}}, */
+/*         {"John", {0.40, 0.55}}, */
+/*         {"Anna", {0.55, 1.00}} */
+/*     }; */
+/*     // random generator to generate a number between 0 and 1 */
+/*     random_device rd; */
+/*     mt19937 gen(rd()); */
+/*     uniform_real_distribution<> dis(0, 1); */
 
-    double random_number = dis(gen);
-    // for each candidate check if the random number is within the candidates interval
-    // if so return the name of the candidate
-    for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
-        if(random_number >= it->second.first && random_number <= it->second.second){
-            return it->first;
-        }
-    }
-    // the return statement should not be reached
-    return NULL;
-}
+/*     double random_number = dis(gen); */
+/*     // for each candidate check if the random number is within the candidates interval */
+/*     // if so return the name of the candidate */
+/*     for (auto it = Candidates.begin(); it != Candidates.end(); it++) { */
+/*         if(random_number >= it->second.first && random_number <= it->second.second){ */
+/*             return it->first; */
+/*         } */
+/*     } */
+/*     // the return statement should not be reached */
+/*     return NULL; */
+/* } */
 void log(custom::Station* station, int station_number, int current_time, int starting_time){
     auto total_votes = station->get_total_votes();
     auto ordinary_queue = station->get_normal();
@@ -399,7 +403,7 @@ void* start_station( void* args_ptr ) {
         pthread_cond_signal(voter->get_cond());
         pthread_mutex_unlock(voter->get_mutex());
 
-        /* pthread_join(*voter->get_thread(), NULL); */
+        pthread_join(voter->get_thread(), NULL);
         // increment the total number of votes for the given result
         /* station->increment_vote( vote_res ); */
 

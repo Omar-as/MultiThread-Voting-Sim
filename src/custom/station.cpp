@@ -21,6 +21,7 @@ namespace custom {
 
             pthread_mutex_t* mutex_queues;
             pthread_mutex_t* mutex_candidates;
+            pthread_mutex_t* mutex_vote;
 
 
 
@@ -29,10 +30,14 @@ namespace custom {
             Station(){
                 mutex_queues = new pthread_mutex_t;
                 mutex_candidates = new pthread_mutex_t;
-                if(pthread_mutex_init(mutex_queues,NULL)) {
+                mutex_vote = new pthread_mutex_t;
+                if(pthread_mutex_init(mutex_queues, NULL)) {
                     cout << "mutex initialization failed" << endl;
                 }
-                if(pthread_mutex_init(mutex_candidates,NULL)) {
+                if(pthread_mutex_init(mutex_candidates, NULL)) {
+                    cout << "mutex initialization failed" << endl;
+                }
+                if(pthread_mutex_init(mutex_vote, NULL)) {
                     cout << "mutex initialization failed" << endl;
                 }
 
@@ -41,8 +46,10 @@ namespace custom {
             ~Station() {
                 pthread_mutex_destroy(mutex_queues);
                 pthread_mutex_destroy(mutex_candidates);
+                pthread_mutex_destroy(mutex_vote);
                 delete mutex_queues;
                 delete mutex_candidates;
+                delete mutex_vote;
             }
 
 
@@ -110,6 +117,7 @@ namespace custom {
 
             pthread_mutex_t* get_mutex() { return mutex_queues; }
             pthread_mutex_t* get_candidates_mutex() { return mutex_candidates; }
+            pthread_mutex_t* get_vote_mutex() { return mutex_vote; }
 
             map<string, int> get_total_votes() { return total_votes; }
 

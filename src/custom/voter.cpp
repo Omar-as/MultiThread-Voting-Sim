@@ -12,7 +12,7 @@ namespace custom {
 
             pthread_mutex_t* mutex_ready;
             pthread_cond_t* cond_vote;
-            pthread_t* voter_thread;
+            pthread_t voter_thread;
 
             bool ready;
             int ticket_number;
@@ -56,14 +56,14 @@ namespace custom {
             pthread_cond_t* get_cond() {
                 return cond_vote;
             }
-            pthread_t* get_thread() {
+            pthread_t get_thread() {
                 return voter_thread;
             }
 
             bool get_ready() {
                 return ready;
             }
-            void set_thread(pthread_t* thread) {
+            void set_thread(pthread_t thread) {
                 voter_thread = thread;
             }
             void set_ready( bool set){
