@@ -29,6 +29,9 @@ using namespace std;
 /* Constants */
 /*************/
 
+// Time per voter
+#define T 1
+
 /* #define NORMAL   3 */
 /* #define SPECIAL  2 */
 /* #define MECHANIC 1 */
@@ -187,17 +190,21 @@ void* vote_thread_func(void* args_ptr) {
     auto lock = voter->get_mutex();
     auto lock_vote = voter->get_mutex();
     auto cond = voter->get_cond();
+
+    // sleep until the thread recieves a signal
     pthread_mutex_lock(lock);
 
     while( !voter->get_ready() ){
         pthread_cond_wait(cond, lock);
     }
-    /* cout << voter->get_ticket_number() << "woke up" << endl; */
 
     pthread_mutex_unlock(lock);
 
+    // lock voting station
     pthread_mutex_lock(lock_vote);
-    custom::pthread_sleep(2);
+
+    // sleep 2t seconds to simulate voting
+    custom::pthread_sleep(2 * T);
 
     // Candidates with CDF interval
     const map<string, pair<float,float>> Candidates = {
@@ -222,6 +229,7 @@ void* vote_thread_func(void* args_ptr) {
     }
 
     voter->set_ready(false);
+    // unclock voting station
     pthread_mutex_unlock(lock_vote);
 
     return 0;
@@ -238,9 +246,6 @@ void* create_voters( void* args_ptr )
     probability         = args.probability;
     sim_time            = args.sim_time;
     number_of_stations  = args.number_of_stations;
-
-    // Time per voter
-    const auto t = 1;
 
     // Ticket Counter
     int ticket_no = 1;
@@ -281,49 +286,26 @@ void* create_voters( void* args_ptr )
         ticket_no++;
 
         // Thread sleeps for t secs
-        custom::pthread_sleep(t);
+        custom::pthread_sleep(T);
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
     return EXIT_SUCCESS;
 }
 
-/* string vote(){ */
-/*     // Candidates with CDF interval */
-/*     const map<string, pair<float,float>> Candidates = { */
-/*         {"Mary", {0.00, 0.40}}, */
-/*         {"John", {0.40, 0.55}}, */
-/*         {"Anna", {0.55, 1.00}} */
-/*     }; */
-/*     // random generator to generate a number between 0 and 1 */
-/*     random_device rd; */
-/*     mt19937 gen(rd()); */
-/*     uniform_real_distribution<> dis(0, 1); */
-
-/*     double random_number = dis(gen); */
-/*     // for each candidate check if the random number is within the candidates interval */
-/*     // if so return the name of the candidate */
-/*     for (auto it = Candidates.begin(); it != Candidates.end(); it++) { */
-/*         if(random_number >= it->second.first && random_number <= it->second.second){ */
-/*             return it->first; */
-/*         } */
-/*     } */
-/*     // the return statement should not be reached */
-/*     return NULL; */
-/* } */
 void log(custom::Station* station, int station_number, int current_time, int starting_time){
+
     auto total_votes = station->get_total_votes();
     auto ordinary_queue = station->get_normal();
     auto special_queue = station->get_special();
     auto curr_time = (current_time - starting_time);
-    /* cout << "Special is empty: " << special_queue.empty() << endl; */
+
     cout << "At " << curr_time << " sec, polling station " << station_number << ", elderly/pregnant:";
     while(!special_queue.empty()) {
         cout << special_queue.front()->get_ticket_number();
         special_queue.pop();
         if (!special_queue.empty()) cout << ", ";
     }
-    /* cout << endl << "Ordinary is empty: " << ordinary_queue.empty() << endl; */
     cout << endl << "At " << curr_time << " sec, polling station " << station_number << ", ordinary:";
     while(!ordinary_queue.empty()) {
         cout << ordinary_queue.front()->get_ticket_number();
@@ -347,11 +329,8 @@ void* start_station( void* args_ptr ) {
     sim_time       = args.sim_time;
     station_number = args.station_number;
     n              = args.nth_second;
-    /* cout << "starting station" << station_number << endl; */
-
 
     // Simulation timer
-    auto t = 1;
     auto station = stations[ station_number ];
     auto current_time =  chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -361,6 +340,9 @@ void* start_station( void* args_ptr ) {
     while(current_time < end_sim_time) {
 
         // logging starting from the nth second
+        // TODO: remove when you redo the logging
+        // the logging shouldn't be here 
+        // we have to create another thread in the main process to log every second
         if (current_time - starting_time >= n) {
             log(station, station_number, current_time, starting_time);
         }
@@ -369,7 +351,8 @@ void* start_station( void* args_ptr ) {
         if(station->normal_waiting() <= 0 && station->special_waiting() <= 0) {
             current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
-            custom::pthread_sleep(t);
+            // TODO: remove when you redo the logging
+            custom::pthread_sleep(T);
             continue;
         }
 
@@ -391,24 +374,15 @@ void* start_station( void* args_ptr ) {
             voter = station->get_normal().front()->get_ticket_number() > station->get_special().front()->get_ticket_number() ? station->pop_special() : station->pop_normal();
         }
 
-
-        // makes the voter vote and we get their voting result
-        /* string vote_res = vote(); */
-
+        // wake up the voter thread by signaling to its cond variable
         pthread_mutex_lock(voter->get_mutex());
-
-        /* cout << "signaling " << voter->get_ticket_number()  << endl; */
-
         voter->set_ready(true);
         pthread_cond_signal(voter->get_cond());
         pthread_mutex_unlock(voter->get_mutex());
 
+        // wait for the voter to finish voting
         pthread_join(voter->get_thread(), NULL);
-        // increment the total number of votes for the given result
-        /* station->increment_vote( vote_res ); */
 
-        // sleep the thread for 2t
-        /* custom::pthread_sleep(2 * t); */
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 

@@ -69,13 +69,10 @@ namespace custom {
 
             void add_voter ( int ticket_no, string queue_name ) {
 
-                /* cout << "add locking" << endl; */
                 auto lock = get_mutex();
 
-                // aquiring lock for pushing a mechanic into the queue
+                // aquiring lock for pushing a voter into the queue
                 pthread_mutex_lock (lock);
-
-                /* cout << "add locked" << endl; */
 
                 auto voter = new Voter(ticket_no);
 
@@ -91,22 +88,18 @@ namespace custom {
 
                 // release lock
                 pthread_mutex_unlock (lock);
-                /* cout << "add unlocked" << endl; */
             }
 
             void increment_vote ( string candidate ) {
                 auto lock = get_candidates_mutex();
 
-                /* cout << "vote started locking" << endl; */
                 // aquiring lock for incrementing the vote count
                 pthread_mutex_lock (lock);
 
                 total_votes[candidate]++; 
 
-                /* cout << "vote locked" << endl; */
                 // release lock
                 pthread_mutex_unlock (lock);
-                /* cout << "vote unlocked" << endl; */
             }
 
             queue<Voter*> get_normal()      { return normal;   }
@@ -116,7 +109,9 @@ namespace custom {
             queue<Voter*> get_mechanic()    { return mechanic; }
 
             pthread_mutex_t* get_mutex() { return mutex_queues; }
+
             pthread_mutex_t* get_candidates_mutex() { return mutex_candidates; }
+
             pthread_mutex_t* get_vote_mutex() { return mutex_vote; }
 
             map<string, int> get_total_votes() { return total_votes; }
