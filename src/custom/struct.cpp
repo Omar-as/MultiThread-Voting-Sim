@@ -13,7 +13,7 @@ namespace custom {
     struct station_args_struct {
        int sim_time;
        int station_number;
-       int nth_second;
+       float failure_probability;
     };
 }
 #endif

@@ -61,10 +61,21 @@ namespace custom {
             }
 
             bool get_ready() {
-                return ready;
+                auto lock = mutex_ready;
+                pthread_mutex_lock(lock);
+
+                auto val = ready;
+
+                pthread_mutex_unlock(lock);
+                return val;
             }
             void set_thread(pthread_t thread) {
+                auto lock = mutex_ready;
+                pthread_mutex_lock(lock);
+
                 voter_thread = thread;
+
+                pthread_mutex_unlock(lock);
             }
             void set_ready( bool set){
                 auto lock = mutex_ready;
