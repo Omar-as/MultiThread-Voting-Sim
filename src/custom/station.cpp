@@ -16,9 +16,13 @@ namespace custom {
 
         private:
 
-            queue<Voter*> normal;
-            queue<Voter*> special;
-            queue<Voter*> mechanic;
+            map<string ,queue<Voter*>> voters = {
+                {"normal", {}},
+                {"special", {}},
+                {"mechanic", {}}
+            };
+            /* queue<Voter*> special; */
+            /* queue<Voter*> mechanic; */
 
             pthread_mutex_t* mutex_queues;
             pthread_mutex_t* mutex_candidates;
@@ -28,7 +32,7 @@ namespace custom {
 
         public:
 
-            Station(){
+            Station() {
                 mutex_queues = new pthread_mutex_t;
                 mutex_candidates = new pthread_mutex_t;
                 mutex_vote = new pthread_mutex_t;
@@ -60,35 +64,13 @@ namespace custom {
                 {"Anna", 0},
             };
 
-            int normal_waiting()    {
+            int queue_size(string queue_name)    {
 
                 auto lock = get_mutex();
 
                 pthread_mutex_lock (lock);
 
-                auto val = normal.size();
-
-                pthread_mutex_unlock (lock);
-                return val;   
-            }
-
-            int special_waiting()   {
-                auto lock = get_mutex();
-
-                pthread_mutex_lock (lock);
-
-                auto val = special.size();
-
-                pthread_mutex_unlock (lock);
-                return val;   
-            }
-
-            int mechanic_waiting()  {
-                auto lock = get_mutex();
-
-                pthread_mutex_lock (lock);
-
-                auto val = mechanic.size();
+                auto val = voters[queue_name].size();
 
                 pthread_mutex_unlock (lock);
                 return val;   
@@ -96,7 +78,7 @@ namespace custom {
 
             int get_total_waiting() {
 
-                auto val = normal_waiting() + special_waiting() + mechanic_waiting(); 
+                auto val = queue_size("normal") + queue_size("special") + queue_size("mechanic"); 
 
                 return val;   
             }
@@ -110,15 +92,7 @@ namespace custom {
 
                 auto voter = new Voter(ticket_no);
 
-                if(queue_name == "normal") {
-                    normal.push(voter);
-                }
-                else if(queue_name == "special") {
-                    special.push(voter);
-                } 
-                else if (queue_name == "mechanic"){
-                    mechanic.push(voter); 
-                }
+                voters[queue_name].push(voter);
 
                 // release lock
                 pthread_mutex_unlock (lock);
@@ -137,40 +111,18 @@ namespace custom {
                 pthread_mutex_unlock (lock);
             }
 
-            queue<Voter*> get_normal()      { 
+            queue<Voter*> get_queue(string queue_name)      { 
                 auto lock = get_mutex();
 
-                cout << "before the get normal lock" << endl;
+                /* cout << "before the get normal lock" << endl; */
 
                 pthread_mutex_lock (lock);
-                cout << "after the get normal lock" << endl;
+                /* cout << "after the get normal lock" << endl; */
 
-                auto val = normal; 
-
-                pthread_mutex_unlock (lock);
-                cout << "after the get normal unlock" << endl;
-                return val;   
-            }
-
-            queue<Voter*> get_special()     {
-                auto lock = get_mutex();
-
-                pthread_mutex_lock (lock);
-
-                auto val = special; 
+                auto val = voters[queue_name];
 
                 pthread_mutex_unlock (lock);
-                return val;   
-            }
-
-            queue<Voter*> get_mechanic()    { 
-                auto lock = get_mutex();
-
-                pthread_mutex_lock (lock);
-
-                auto val = mechanic; 
-
-                pthread_mutex_unlock (lock);
+                /* cout << "after the get normal unlock" << endl; */
                 return val;   
             }
 
@@ -191,31 +143,16 @@ namespace custom {
                 return val;   
             }
 
-            Voter* pop_normal() {
+            Voter* pop_queue(string queue_name) {
 
                 auto lock = get_mutex();
 
                 // aquiring lock for poping from the queue
                 pthread_mutex_lock (lock);
+                auto queue = &voters[queue_name];
 
-                auto val = normal.front();
-                normal.pop();
-
-                // release lock
-                pthread_mutex_unlock (lock);
-
-                return val;
-            }
-            
-            Voter* pop_special() {
-
-                auto lock = get_mutex();
-
-                // aquiring lock for poping from the queue
-                pthread_mutex_lock (lock);
-
-                auto val = special.front();
-                special.pop();
+                auto val = queue->front();
+                queue->pop();
 
                 // release lock
                 pthread_mutex_unlock (lock);
@@ -223,15 +160,14 @@ namespace custom {
                 return val;
             }
 
-            Voter* pop_mechanic() {
+            Voter* queue_front(string queue_name) {
 
                 auto lock = get_mutex();
 
                 // aquiring lock for poping from the queue
                 pthread_mutex_lock (lock);
 
-                auto val = mechanic.front();
-                mechanic.pop();
+                auto val = voters[queue_name].front();
 
                 // release lock
                 pthread_mutex_unlock (lock);
@@ -239,35 +175,6 @@ namespace custom {
                 return val;
             }
 
-            Voter* normal_front() {
-
-                auto lock = get_mutex();
-
-                // aquiring lock for poping from the queue
-                pthread_mutex_lock (lock);
-
-                auto val = normal.front();
-
-                // release lock
-                pthread_mutex_unlock (lock);
-
-                return val;
-            }
-
-            Voter* special_front() {
-
-                auto lock = get_mutex();
-
-                // aquiring lock for poping from the queue
-                pthread_mutex_lock (lock);
-
-                auto val = special.front();
-
-                // release lock
-                pthread_mutex_unlock (lock);
-
-                return val;
-            }
     };
 }
 #endif

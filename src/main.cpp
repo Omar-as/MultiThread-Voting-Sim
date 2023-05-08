@@ -190,7 +190,7 @@ int get_least_crowded_station( int number_of_stations ) {
 
         int current = stations[i+1]->get_total_waiting();
 
-        if ( current < total_waiting ){
+        if ( current < total_waiting ) {
             total_waiting = current;
             stat_number = i+1;
         }
@@ -225,6 +225,7 @@ void* vote_thread_func(void* args_ptr) {
         {"John", {0.40, 0.55}},
         {"Anna", {0.55, 1.00}}
     };
+
     // random generator to generate a number between 0 and 1
     random_device rd;
     mt19937 gen(rd());
@@ -280,7 +281,7 @@ void* create_voters( void* args_ptr )
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
-        string queue = (random_number <= probability) ? "normal" : "special";
+        string queue = (0 < random_number && random_number <= probability) ? "normal" : "special";
         auto voter = station->add_voter(ticket_no, queue);
 
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
@@ -309,8 +310,8 @@ void log_print(int current_time, int starting_time){
         auto station = it->second;
         auto station_number = it->first;
         auto total_votes = station->get_total_votes();
-        auto ordinary_queue = station->get_normal();
-        auto special_queue = station->get_special();
+        auto ordinary_queue = station->get_queue("normal");
+        auto special_queue = station->get_queue("special");
 
         cout << "At " << curr_time << " sec, polling station " << station_number << ", elderly/pregnant:";
         while(!special_queue.empty()) {
@@ -332,14 +333,14 @@ void log_print(int current_time, int starting_time){
 
     }
 
-    cout << "At " << curr_time << " sec total votes: " "(Mary: " << total_vote_arr[0] << ", John: "  <<  total_vote_arr[1] << ", Anna: " << total_vote_arr[2]  << ")" <<  endl;
+    cout << "At " << curr_time << " sec total votes: " "(Mary: " << total_vote_arr[0] << ", John: "  <<  total_vote_arr[1] << ", Anna: " << total_vote_arr[2]  << ")" <<  endl << endl;
 
 }
 
 void* log(void* args_ptr){
 
-    auto args      = (pair<int, int>*) args_ptr;
-    auto n      = args->first;
+    auto args     = (pair<int, int>*) args_ptr;
+    auto n        = args->first;
     auto sim_time = args->second;
 
     auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -389,7 +390,7 @@ void* start_station( void* args_ptr ) {
             uniform_real_distribution<> dis(0, 1);
 
             double random_number = dis(gen);
-            failed = (random_number <= failure_probability);
+            failed = (0 < failure_probability && random_number <= failure_probability);
 
             fail = chrono::system_clock::to_time_t(chrono::system_clock::now());
         }
@@ -397,7 +398,7 @@ void* start_station( void* args_ptr ) {
         if (!failed) {
 
             // checks if there are any voters waiting to vote
-            if(station->normal_waiting() <= 0 && station->special_waiting() <= 0) {
+            if(station->queue_size("normal") <= 0 && station->queue_size("special") <= 0) {
                 current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
                 continue;
@@ -405,20 +406,21 @@ void* start_station( void* args_ptr ) {
 
             // checks if we have have less than 5 ordinary voters waiting and at least 1 special voter
             // if so it gives the special voter priority to vote
-            if(station->normal_waiting() < 5 && station->special_waiting() > 0) {
-                voter = station->pop_special();
+            if(station->queue_size("normal") < 5 && station->queue_size("special") > 0) {
+                voter = station->pop_queue("special");
             }
 
             // checks if there are no special voters waiting
             // if so we let an ordinary voter vote
-            else if(station->special_waiting() <= 0) {
-                voter = station->pop_normal();
+            else if(station->queue_size("special") <= 0) {
+                voter = station->pop_queue("normal");
             }
 
             // if none of the above conditions hold we check the tickets of the first ordinary voter and the first special voter
             // and let the one with the lowest ticket number vote
             else {
-                voter = station->normal_front()->get_ticket_number() > station->special_front()->get_ticket_number() ? station->pop_special() : station->pop_normal();
+                bool check = (station->queue_front("normal")->get_ticket_number() > station->queue_front("special")->get_ticket_number());
+                voter = station->pop_queue(check ? "special" : "normal");
             }
 
             // wake up the voter thread by signaling to its cond variable
