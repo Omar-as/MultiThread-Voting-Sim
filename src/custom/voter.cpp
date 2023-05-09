@@ -12,6 +12,7 @@ namespace custom {
 
             pthread_mutex_t* mutex_ready;
             pthread_cond_t* cond_vote;
+
             pthread_t voter_thread;
 
             bool ready;
@@ -33,8 +34,6 @@ namespace custom {
                     cout << "cond_vote initialization failed" << endl;
                 }
 
-                /* pthread_t voter_thread; */
-                /* pthread_create( &voter_thread, NULL, vote_thread_func, NULL ); */
                 ticket_number = ticket_no;
                 ready = false;
             }
@@ -46,7 +45,6 @@ namespace custom {
                 pthread_cond_destroy(cond_vote);
                 delete cond_vote;
             }
-            /* void vote(){} */
             int get_ticket_number() {
                 return ticket_number;
             }

@@ -117,22 +117,23 @@ int main(int argc, char **argv) {
     auto failure_probability = program.get<float>("-f");
 
     // Constant Verifiers
-    if (time <= 0){
+    if (time <= 0) {
         cout << "The total time for the simulation (-t) should be more than 0" << endl;
         return EXIT_FAILURE;
     }
-    if (probability < 0 || probability > 1){
+    if (probability < 0 || probability > 1) {
         cout << "The probability (-p) should be more than or equal to 0 and less than or equal to 1" << endl;
         return EXIT_FAILURE;
     }
-    if (number_of_stations <= 0){
+    if (number_of_stations <= 0) {
         cout << "The number of stations (-c) should be more than 0" << endl;
         return EXIT_FAILURE;
     }
-    if (failure_probability < 0 || failure_probability > 1){
+    if (failure_probability < 0 || failure_probability > 1) {
         cout << "The failure probability (-f) should be more than or equal to 0 and less than or equal to 1" << endl;
         return EXIT_FAILURE;
     }
+
 
 
     for (int i = 0; i < number_of_stations; i++) {
@@ -282,6 +283,12 @@ void* create_voters( void* args_ptr )
         auto& station = stations[least_crowded_station];
 
         string queue = (0 < random_number && random_number <= probability) ? "normal" : "special";
+
+        auto lock = station->get_mutex();
+
+        // aquiring lock for pushing a voter into the queue
+        pthread_mutex_lock (lock);
+
         auto voter = station->add_voter(ticket_no, queue);
 
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
@@ -292,6 +299,9 @@ void* create_voters( void* args_ptr )
         voter->set_thread(voter_thread);
 
         ticket_no++;
+
+        // release lock
+        pthread_mutex_unlock (lock);
 
         // Thread sleeps for t secs
         custom::pthread_sleep(T);
@@ -343,9 +353,9 @@ void* log(void* args_ptr){
     auto n        = args->first;
     auto sim_time = args->second;
 
-    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto current_time  = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    auto end_sim_time =  static_cast<int>(current_time) + sim_time;
+    auto end_sim_time  =  static_cast<int>(current_time) + sim_time;
     
     while(current_time < end_sim_time){
 
@@ -356,6 +366,8 @@ void* log(void* args_ptr){
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
         custom::pthread_sleep(T);
     }
+
+    log_print(current_time, starting_time);
 
     return EXIT_SUCCESS;
 
@@ -384,7 +396,7 @@ void* start_station( void* args_ptr ) {
 
     while(current_time < end_sim_time) {
 
-        if (current_time - fail >= 10) {
+        if (current_time - fail >= (10 * T)) {
             random_device rd;
             mt19937 gen(rd());
             uniform_real_distribution<> dis(0, 1);
@@ -404,7 +416,7 @@ void* start_station( void* args_ptr ) {
                 continue;
             }
 
-            // checks if we have have less than 5 ordinary voters waiting and at least 1 special voter
+            // checks if we have less than 5 ordinary voters waiting and at least 1 special voter
             // if so it gives the special voter priority to vote
             if(station->queue_size("normal") < 5 && station->queue_size("special") > 0) {
                 voter = station->pop_queue("special");
@@ -425,13 +437,17 @@ void* start_station( void* args_ptr ) {
 
             // wake up the voter thread by signaling to its cond variable
             pthread_mutex_lock(voter->get_mutex());
+
             voter->set_ready(true);
             pthread_cond_signal(voter->get_cond());
+
             pthread_mutex_unlock(voter->get_mutex());
 
+
             // wait for the voter to finish voting
-            pthread_join(voter->get_thread(), NULL);
-        } else if (current_time - fail >= 5) {
+            auto voter_thread = voter->get_thread();
+            pthread_join(voter_thread, NULL);
+        } else if (current_time - fail >= (5 * T)) {
 
             failed = false;
             fail = chrono::system_clock::to_time_t(chrono::system_clock::now());

@@ -21,8 +21,6 @@ namespace custom {
                 {"special", {}},
                 {"mechanic", {}}
             };
-            /* queue<Voter*> special; */
-            /* queue<Voter*> mechanic; */
 
             pthread_mutex_t* mutex_queues;
             pthread_mutex_t* mutex_candidates;
@@ -85,17 +83,11 @@ namespace custom {
 
             Voter* add_voter ( int ticket_no, string queue_name ) {
 
-                auto lock = get_mutex();
-
-                // aquiring lock for pushing a voter into the queue
-                pthread_mutex_lock (lock);
 
                 auto voter = new Voter(ticket_no);
 
                 voters[queue_name].push(voter);
 
-                // release lock
-                pthread_mutex_unlock (lock);
                 return voter;
             }
 
@@ -114,15 +106,11 @@ namespace custom {
             queue<Voter*> get_queue(string queue_name)      { 
                 auto lock = get_mutex();
 
-                /* cout << "before the get normal lock" << endl; */
-
                 pthread_mutex_lock (lock);
-                /* cout << "after the get normal lock" << endl; */
 
                 auto val = voters[queue_name];
 
                 pthread_mutex_unlock (lock);
-                /* cout << "after the get normal unlock" << endl; */
                 return val;   
             }
 
