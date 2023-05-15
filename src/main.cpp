@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
 
 
     for (int i = 0; i < number_of_stations; i++) {
-        custom::Station* station = new custom::Station();
+        custom::Station* station = new custom::Station(i+1);
         pair<int,custom::Station*> st =  { i+1, station };
         stations.insert(st); 
     }
@@ -234,6 +234,8 @@ void* vote_thread_func(void* args_ptr) {
 
     double random_number = dis(gen);
 
+    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+
     // for each candidate check if the random number is within the candidates interval
     // if so return the name of the candidate
     for (auto it = Candidates.begin(); it != Candidates.end(); it++) {
@@ -242,6 +244,12 @@ void* vote_thread_func(void* args_ptr) {
              break;
         }
     }
+
+    cout << station->get_station_number() << " Station Number" << endl;
+    cout << voter->get_ticket_number() << " Ticket Number" << endl;
+    cout << voter->get_request_time() << " Requested time" <<  endl;
+    cout << current_time << " polling station time" <<  endl;
+    cout << current_time - voter->get_request_time() << " Turnaround time" << endl;
 
     voter->set_ready(false);
 
@@ -266,6 +274,10 @@ void* create_voters( void* args_ptr )
     // Ticket Counter
     int ticket_no = 1;
 
+    // Simulation timer
+    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto end_sim_time =  static_cast<int>(current_time) + sim_time;
+
     for (int i = 0; i < 2; i++) { 
 
         int least_crowded_station = get_least_crowded_station(number_of_stations);
@@ -277,7 +289,7 @@ void* create_voters( void* args_ptr )
         // aquiring lock for pushing a voter into the queue
         pthread_mutex_lock (lock);
 
-        auto voter = station->add_voter(ticket_no, queue);
+        auto voter = station->add_voter(ticket_no, current_time, queue);
 
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
 
@@ -290,11 +302,9 @@ void* create_voters( void* args_ptr )
 
         // release lock
         pthread_mutex_unlock (lock);
-    }
 
-    // Simulation timer
-    auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    auto end_sim_time =  static_cast<int>(current_time) + sim_time;
+        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    }
 
     while(current_time < end_sim_time){
 
@@ -315,7 +325,7 @@ void* create_voters( void* args_ptr )
         // aquiring lock for pushing a voter into the queue
         pthread_mutex_lock (lock);
 
-        auto voter = station->add_voter(ticket_no, queue);
+        auto voter = station->add_voter(ticket_no, current_time, queue);
 
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
 

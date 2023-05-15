@@ -26,11 +26,13 @@ namespace custom {
             pthread_mutex_t* mutex_candidates;
             pthread_mutex_t* mutex_vote;
 
+            int station_number;
+
 
 
         public:
 
-            Station() {
+            Station(int station_no) {
                 mutex_queues = new pthread_mutex_t;
                 mutex_candidates = new pthread_mutex_t;
                 mutex_vote = new pthread_mutex_t;
@@ -43,6 +45,8 @@ namespace custom {
                 if(pthread_mutex_init(mutex_vote, NULL)) {
                     cout << "mutex initialization failed" << endl;
                 }
+
+                station_number = station_no;
 
             }
 
@@ -61,6 +65,11 @@ namespace custom {
                 {"John", 0},
                 {"Anna", 0},
             };
+
+            int get_station_number() {
+
+                return station_number;   
+            }
 
             int queue_size(string queue_name)    {
 
@@ -81,10 +90,10 @@ namespace custom {
                 return val;   
             }
 
-            Voter* add_voter ( int ticket_no, string queue_name ) {
+            Voter* add_voter ( int ticket_no, int req_time, string queue_name ) {
 
 
-                auto voter = new Voter(ticket_no);
+                auto voter = new Voter(ticket_no, req_time);
 
                 voters[queue_name].push(voter);
 
