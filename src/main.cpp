@@ -266,6 +266,32 @@ void* create_voters( void* args_ptr )
     // Ticket Counter
     int ticket_no = 1;
 
+    for (int i = 0; i < 2; i++) { 
+
+        int least_crowded_station = get_least_crowded_station(number_of_stations);
+        auto& station = stations[least_crowded_station];
+        string queue = (i == 0) ? "normal" : "special";
+
+        auto lock = station->get_mutex();
+
+        // aquiring lock for pushing a voter into the queue
+        pthread_mutex_lock (lock);
+
+        auto voter = station->add_voter(ticket_no, queue);
+
+        auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
+
+        pthread_t voter_thread;
+        pthread_create( &voter_thread, NULL, vote_thread_func, (void *) args );
+
+        voter->set_thread(voter_thread);
+
+        ticket_no++;
+
+        // release lock
+        pthread_mutex_unlock (lock);
+    }
+
     // Simulation timer
     auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time =  static_cast<int>(current_time) + sim_time;
@@ -356,15 +382,20 @@ void* log(void* args_ptr){
     auto current_time  = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time  =  static_cast<int>(current_time) + sim_time;
+
+    auto zero_count = 0;
     
     while(current_time < end_sim_time){
 
         if (current_time - starting_time >= n) {
-            log_print(current_time, starting_time);
+            if (zero_count != 0){
+                log_print(current_time, starting_time);
+            }
         }
 
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
         custom::pthread_sleep(T);
+        zero_count++;
     }
 
     log_print(current_time, starting_time);
