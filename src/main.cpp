@@ -15,6 +15,7 @@ using namespace std;
 #include "custom/struct.cpp"
 #include "custom/voter.cpp"
 #include "custom/station.cpp"
+#include "custom/log.cpp"
 /* #include "custom/myqueue.cpp" */
 
 /* Other Imports */
@@ -44,6 +45,7 @@ using namespace std;
 /****************/
 
 map<int,custom::Station*> stations;
+int sim_starting_time;
 
 /******************************************************************************/
 
@@ -142,6 +144,7 @@ int main(int argc, char **argv) {
         stations.insert(st); 
     }
 
+    custom::resetLogFile();
 
     // thread variables
     pthread_t creation_thread;
@@ -245,11 +248,12 @@ void* vote_thread_func(void* args_ptr) {
         }
     }
 
-    cout << station->get_station_number() << " Station Number" << endl;
-    cout << voter->get_ticket_number() << " Ticket Number" << endl;
-    cout << voter->get_request_time() << " Requested time" <<  endl;
-    cout << current_time << " polling station time" <<  endl;
-    cout << current_time - voter->get_request_time() << " Turnaround time" << endl;
+    custom::log_voter_Data(station->get_station_number(),
+            voter->get_ticket_number(),
+            voter->get_category(),
+            voter->get_request_time() - sim_starting_time,
+            current_time - sim_starting_time,
+            current_time - voter->get_request_time());
 
     voter->set_ready(false);
 
@@ -276,6 +280,7 @@ void* create_voters( void* args_ptr )
 
     // Simulation timer
     auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    sim_starting_time = current_time;
     auto end_sim_time =  static_cast<int>(current_time) + sim_time;
 
     for (int i = 0; i < 2; i++) { 
@@ -488,7 +493,15 @@ void* start_station( void* args_ptr ) {
             // wait for the voter to finish voting
             auto voter_thread = voter->get_thread();
             pthread_join(voter_thread, NULL);
+
         } else if (current_time - fail >= (5 * T)) {
+
+            custom::log_voter_Data(station->get_station_number(),
+                    -1,
+                    "mechanic",
+                    fail - sim_starting_time,
+                    current_time - sim_starting_time,
+                    current_time - fail);
 
             failed = false;
             fail = chrono::system_clock::to_time_t(chrono::system_clock::now());

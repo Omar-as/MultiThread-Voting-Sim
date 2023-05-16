@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <pthread.h>
+#include <string>
+
 using namespace std;
 namespace custom {
 
@@ -18,8 +20,9 @@ namespace custom {
             bool ready;
             int ticket_number;
             int request_time;
+            string category;
         public:
-            Voter(int ticket_no, int req_time) {
+            Voter(int ticket_no, int req_time, string cat) {
                 mutex_vote = new pthread_mutex_t;
                 if(pthread_mutex_init(mutex_vote, NULL)) {
                     cout << "mutex_vote initialization failed" << endl;
@@ -37,6 +40,7 @@ namespace custom {
 
                 ticket_number = ticket_no;
                 request_time = req_time; 
+                category = cat;
                 ready = false;
             }
             ~Voter() {
@@ -47,12 +51,17 @@ namespace custom {
                 pthread_cond_destroy(cond_vote);
                 delete cond_vote;
             }
+
             int get_ticket_number() {
                 return ticket_number;
             }
             int get_request_time() {
                 return request_time;
             }
+            string get_category() {
+                return category;
+            }
+
             pthread_mutex_t* get_mutex() {
                 return mutex_vote;
             }

@@ -93,7 +93,7 @@ namespace custom {
             Voter* add_voter ( int ticket_no, int req_time, string queue_name ) {
 
 
-                auto voter = new Voter(ticket_no, req_time);
+                auto voter = new Voter(ticket_no, req_time, queue_name);
 
                 voters[queue_name].push(voter);
 
