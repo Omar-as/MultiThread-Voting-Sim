@@ -1,28 +1,45 @@
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 using namespace std;
 
+#define SEP ' '
+#define LOG_FILE "voters.log"
+#define SEP_WIDTH 25
+
 namespace custom { 
 
-    void log_voter_Data(int station_no, int ticket_no, string category, int req_time, int poll_stat_time, int turnaround_time){
+    void log_voter_Data(int station_no, int ticket_no, string category, int req_time, int poll_stat_time, int turnaround_time) {
 
 
-        ofstream logFile("voters.log", std::ios::app);
+
+        ofstream logFile(LOG_FILE, ios::app);
 
 
         if (!logFile) {
-            std::cerr << "File could not be opened" << std::endl;
+            cerr << "File could not be opened" << endl;
             return;
         }
 
-        logFile << station_no << "\t" 
-                << ticket_no << "\t" 
-                << category << "\t" 
-                << req_time << "\t" 
-                << poll_stat_time << "\t" 
-                << turnaround_time << "\n";
+        logFile << left << setw(SEP_WIDTH) << setfill(SEP)
+                << station_no
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << ticket_no
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << category
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << req_time
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << poll_stat_time
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << turnaround_time << endl;
 
         logFile.close();
 
@@ -30,14 +47,32 @@ namespace custom {
 
     void resetLogFile() {
 
-        std::ofstream logFile("voters.log", std::ios::trunc);
+        ofstream logFile(LOG_FILE, ios::trunc);
 
         if (!logFile) {
-            std::cerr << "File could not be opened" << std::endl;
+            cerr << "File could not be opened" << endl;
             return;
         }
 
-        logFile << "StationID   VoterID    Category    Request Time     Polling Station Time      Turnaround Time" << "\n";
+        logFile << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "StationID"
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "VoterID"
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "Category"
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "Request Time"
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "Polling Station Time"
+
+                << left << setw(SEP_WIDTH) << setfill(SEP)
+                << "Turnaround Time" << endl;
+        
+        logFile << "-------------------------------------------------------------------------------------------------------------------------------------------------" << endl;
 
         logFile.close();
     }
