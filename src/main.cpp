@@ -16,7 +16,6 @@ using namespace std;
 #include "custom/voter.cpp"
 #include "custom/station.cpp"
 #include "custom/log.cpp"
-/* #include "custom/myqueue.cpp" */
 
 /* Other Imports */
 
@@ -34,10 +33,6 @@ using namespace std;
 // Time per voter
 #define T 1
 
-/* #define NORMAL   3 */
-/* #define SPECIAL  2 */
-/* #define MECHANIC 1 */
-
 /******************************************************************************/
 
 /****************/
@@ -54,7 +49,9 @@ int sim_starting_time;
 /*************************/
 
 int get_least_crowded_station( int number_of_stations );
+void* vote_thread_func(void* args_ptr);
 void* create_voters( void* args_ptr );
+void log_print(int current_time, int starting_time);
 void* log(void* args_ptr);
 void* start_station( void* args_ptr );
 
@@ -108,7 +105,7 @@ int main(int argc, char **argv) {
     catch (const std::runtime_error& err) {
       cerr << err.what() << endl;
       cerr << program;
-      return 1;
+      return EXIT_FAILURE;
     }
 
     // Parser Constants
@@ -137,13 +134,14 @@ int main(int argc, char **argv) {
     }
 
 
-
+    // initializing the stations
     for (int i = 0; i < number_of_stations; i++) {
         custom::Station* station = new custom::Station(i+1);
         pair<int,custom::Station*> st =  { i+1, station };
         stations.insert(st); 
     }
 
+    // Creating the Log File
     custom::resetLogFile();
 
     // thread variables
@@ -161,12 +159,14 @@ int main(int argc, char **argv) {
     auto l_st =  new pair<int,int>({nth_second, time });
     pthread_create( &log_thread, NULL, log, (void*) l_st );
 
+    // creating multiple threads which each can vote
     vector<custom::station_args_struct*> station_args_ptrs(number_of_stations);
     for (int i = 0; i < number_of_stations; i++) {
+
         custom::station_args_struct* station_args = new custom::station_args_struct{ time, i+1, failure_probability };
         station_args_ptrs[i] = station_args;
-
         pthread_create( &station_threads[i], NULL, start_station, (void*) station_args);
+
     }
 
     // Join Threads
@@ -248,6 +248,7 @@ void* vote_thread_func(void* args_ptr) {
         }
     }
 
+    // Adds to log file
     custom::log_voter_Data(station->get_station_number(),
             voter->get_ticket_number(),
             voter->get_category(),
@@ -260,7 +261,7 @@ void* vote_thread_func(void* args_ptr) {
     // unclock voting station
     pthread_mutex_unlock(lock);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void* create_voters( void* args_ptr )
@@ -283,21 +284,27 @@ void* create_voters( void* args_ptr )
     sim_starting_time = current_time;
     auto end_sim_time =  static_cast<int>(current_time) + sim_time;
 
+
+    // Creating two voters for the zero-th second
     for (int i = 0; i < 2; i++) { 
 
+        // Gets the least least_crowded_station
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
+
         string queue = (i == 0) ? "normal" : "special";
 
+        // Gets the mutex
         auto lock = station->get_mutex();
 
-        // aquiring lock for pushing a voter into the queue
+        // Lock for pushing a voter into the queue
         pthread_mutex_lock (lock);
 
+        // Creates voter
         auto voter = station->add_voter(ticket_no, current_time, queue);
 
+        // sends the voter to voting function
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
-
         pthread_t voter_thread;
         pthread_create( &voter_thread, NULL, vote_thread_func, (void *) args );
 
@@ -320,20 +327,23 @@ void* create_voters( void* args_ptr )
 
         double random_number = dis(gen);
 
+        // Gets the least_crowded_station
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
         string queue = (0 < random_number && random_number <= probability) ? "normal" : "special";
 
+        // Gets the mutex lock 
         auto lock = station->get_mutex();
 
         // aquiring lock for pushing a voter into the queue
         pthread_mutex_lock (lock);
 
+        // creates the voter
         auto voter = station->add_voter(ticket_no, current_time, queue);
 
+        // Sends the voter to the voting function
         auto args = new pair<custom::Station*, custom::Voter*>{station, voter};
-
         pthread_t voter_thread;
         pthread_create( &voter_thread, NULL, vote_thread_func, (void *) args );
 
@@ -420,6 +430,7 @@ void* log(void* args_ptr){
 }
 
 void* start_station( void* args_ptr ) {
+
     // variables from struct
     int sim_time;
     int station_number;
@@ -439,7 +450,6 @@ void* start_station( void* args_ptr ) {
     custom::Voter* voter;
     
     bool failed = false;
-
     while(current_time < end_sim_time) {
 
         if (current_time - fail >= (10 * T)) {
@@ -510,7 +520,7 @@ void* start_station( void* args_ptr ) {
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 /******************************************************************************/

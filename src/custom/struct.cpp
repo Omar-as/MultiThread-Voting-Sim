@@ -9,6 +9,7 @@ namespace custom {
        int sim_time;
        int number_of_stations;
     };
+
     // station creation arguments struct
     struct station_args_struct {
        int sim_time;
