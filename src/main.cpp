@@ -41,6 +41,8 @@ using namespace std;
 
 map<int,custom::Station*> stations;
 int sim_starting_time;
+// Barrier to synch threads 
+pthread_barrier_t barrier;
 
 /******************************************************************************/
 
@@ -143,8 +145,10 @@ int main(int argc, char **argv) {
 
     // Creating the Log File
     custom::resetLogFile();
+    // Initialise barrier
+    pthread_barrier_init(&barrier, NULL, number_of_stations + 2);
 
-    // thread variables
+    // Thread variables
     pthread_t creation_thread;
     pthread_t log_thread;
     vector<pthread_t> station_threads(number_of_stations);
@@ -175,6 +179,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < number_of_stations; i++) {
         pthread_join(station_threads[i], NULL);
     }
+
+    pthread_barrier_destroy(&barrier);
 
     return EXIT_SUCCESS;
 }
@@ -284,7 +290,6 @@ void* create_voters( void* args_ptr )
     sim_starting_time = current_time;
     auto end_sim_time =  static_cast<int>(current_time) + sim_time;
 
-
     // Creating two voters for the zero-th second
     for (int i = 0; i < 2; i++) { 
 
@@ -317,6 +322,10 @@ void* create_voters( void* args_ptr )
 
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
+
+
+    // Wait at the barrier
+    pthread_barrier_wait(&barrier);
 
     while(current_time < end_sim_time){
 
@@ -410,17 +419,20 @@ void* log(void* args_ptr){
 
     auto zero_count = 0;
     
+    current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+
     while(current_time < end_sim_time){
 
         if (current_time - starting_time >= n) {
-            if (zero_count != 0){
-                log_print(current_time, starting_time);
+            log_print(current_time, starting_time);
+            if (zero_count == 0){
+                pthread_barrier_wait(&barrier);
+                zero_count++;
             }
         }
 
-        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
         custom::pthread_sleep(T);
-        zero_count++;
+        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
     log_print(current_time, starting_time);
@@ -450,7 +462,13 @@ void* start_station( void* args_ptr ) {
     custom::Voter* voter;
     
     bool failed = false;
+
+    // Wait at the barrier
+    pthread_barrier_wait(&barrier);
+
     while(current_time < end_sim_time) {
+
+        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
         if (current_time - fail >= (10 * T)) {
             random_device rd;
@@ -467,8 +485,6 @@ void* start_station( void* args_ptr ) {
 
             // checks if there are any voters waiting to vote
             if(station->queue_size("normal") <= 0 && station->queue_size("special") <= 0) {
-                current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-
                 continue;
             }
 
@@ -517,7 +533,6 @@ void* start_station( void* args_ptr ) {
             fail = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
         }
-        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
     return EXIT_SUCCESS;
