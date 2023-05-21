@@ -39,8 +39,11 @@ using namespace std;
 /* Global State */
 /****************/
 
+// Map of all stations
 map<int,custom::Station*> stations;
+
 int sim_starting_time;
+
 // Barrier to synch threads 
 pthread_barrier_t barrier;
 
@@ -112,7 +115,7 @@ int main(int argc, char **argv) {
 
     // Parser Constants
     auto time                = program.get<int>("-t");
-    auto nth_second          = program.get<int>("-n");
+    auto nth_second          = program.get<int>("-n") * TIME;
     auto probability         = program.get<float>("-p");
     auto number_of_stations  = program.get<int>("-c");
     auto failure_probability = program.get<float>("-f");
@@ -135,7 +138,6 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-
     // initializing the stations
     for (int i = 0; i < number_of_stations; i++) {
         custom::Station* station = new custom::Station(i+1);
@@ -144,7 +146,8 @@ int main(int argc, char **argv) {
     }
 
     // Creating the Log File
-    custom::resetLogFile();
+    custom::resetLogFile(nth_second);
+
     // Initialise barrier
     pthread_barrier_init(&barrier, NULL, number_of_stations + 2);
 
@@ -215,7 +218,6 @@ void* vote_thread_func(void* args_ptr) {
     auto voter = args->second;
     auto station = args->first;
 
-
     auto lock = voter->get_mutex();
     auto cond = voter->get_cond();
 
@@ -240,7 +242,6 @@ void* vote_thread_func(void* args_ptr) {
     random_device rd;
     mt19937 gen(rd());
     uniform_real_distribution<> dis(0, 1);
-
     double random_number = dis(gen);
 
     auto current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -277,6 +278,7 @@ void* create_voters( void* args_ptr )
     int     sim_time;
     int     number_of_stations;
 
+    // Getting values from struct
     auto args = *(custom::voter_args_struct *) args_ptr;
     probability         = args.probability;
     sim_time            = args.sim_time;
@@ -376,29 +378,35 @@ void log_print(int current_time, int starting_time){
     int total_vote_arr[3] = {0,0,0};
     auto curr_time = (current_time - starting_time);
 
+    // Remove To check all the logs
     // reseting cursor position to (0,0)
     cout << "\033[2J" << "\033[0;0H";
 
     for (auto it = stations.begin(); it != stations.end(); it++) {
+
         auto station = it->second;
         auto station_number = it->first;
         auto total_votes = station->get_total_votes();
         auto ordinary_queue = station->get_queue("normal");
         auto special_queue = station->get_queue("special");
 
-        /* if ( station->get_failed() ) { */
-        /*     cout << endl << "At " << curr_time << " sec, polling station " << station_number << " is experiencing a failure" << endl << endl; */
-        /* } */
         cout << "At " << curr_time << " sec, polling station " << station_number << (station->get_failed() ? " \033[1;31m(station is getting fixed)\033[0m" : "") << ", elderly/pregnant:";
+
         while(!special_queue.empty()) {
+
             cout << special_queue.front()->get_ticket_number();
             special_queue.pop();
+
             if (!special_queue.empty()) cout << ", ";
         }
+
         cout << endl << "At " << curr_time << " sec, polling station " << station_number << (station->get_failed() ? " \033[1;31m(station is getting fixed)\033[0m" : "") << ", ordinary:";
+
         while(!ordinary_queue.empty()) {
+
             cout << ordinary_queue.front()->get_ticket_number();
             ordinary_queue.pop();
+
             if (!ordinary_queue.empty()) cout << ", ";
         }
         cout << endl;
@@ -423,6 +431,7 @@ void* log(void* args_ptr){
     auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     auto end_sim_time  =  static_cast<int>(current_time) + sim_time;
 
+    // Wait for the barrier at 0 sec
     auto zero_count = 0;
     
     if (n > 0) {
