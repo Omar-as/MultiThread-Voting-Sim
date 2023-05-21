@@ -34,6 +34,7 @@ namespace custom {
             pthread_mutex_t* mutex_vote;
 
             int station_number;
+            bool failed;
 
         public:
 
@@ -54,6 +55,8 @@ namespace custom {
                 if(pthread_mutex_init(mutex_vote, NULL))        { cout << "mutex initialization failed" << endl; }
 
                 station_number = station_no;
+
+                failed = false;
             }
 
             /******************************************************************/
@@ -131,6 +134,20 @@ namespace custom {
                 return val;   
             }
 
+            bool get_failed(){
+
+                auto lock = get_mutex();
+
+                pthread_mutex_lock (lock);
+
+                auto val = failed;
+
+                pthread_mutex_unlock (lock);
+
+                return val;
+                
+            }
+
             /******************************************************************/
 
             Voter* add_voter ( int ticket_no, int req_time, string queue_name ) {
@@ -188,6 +205,18 @@ namespace custom {
                 pthread_mutex_unlock (lock);
 
                 return val;
+            }
+
+            void set_failed( bool val ) {
+
+                auto lock = get_mutex();
+
+                pthread_mutex_lock (lock);
+
+                failed = val;
+
+                pthread_mutex_unlock (lock);
+
             }
 
     };

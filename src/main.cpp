@@ -31,7 +31,7 @@ using namespace std;
 /*************/
 
 // Time per voter
-#define T 1
+#define TIME 1
 
 /******************************************************************************/
 
@@ -227,7 +227,7 @@ void* vote_thread_func(void* args_ptr) {
     }
 
     // sleep 2t seconds to simulate voting
-    custom::pthread_sleep(2 * T);
+    custom::pthread_sleep(2 * TIME);
 
     // Candidates with CDF interval
     const map<string, pair<float,float>> Candidates = {
@@ -340,7 +340,7 @@ void* create_voters( void* args_ptr )
         int least_crowded_station = get_least_crowded_station(number_of_stations);
         auto& station = stations[least_crowded_station];
 
-        string queue = (0 < random_number && random_number <= probability) ? "normal" : "special";
+        string queue = (0 < probability && random_number <= probability) ? "normal" : "special";
 
         // Gets the mutex lock 
         auto lock = station->get_mutex();
@@ -364,7 +364,7 @@ void* create_voters( void* args_ptr )
         pthread_mutex_unlock (lock);
 
         // Thread sleeps for t secs
-        custom::pthread_sleep(T);
+        custom::pthread_sleep(TIME);
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
@@ -376,6 +376,9 @@ void log_print(int current_time, int starting_time){
     int total_vote_arr[3] = {0,0,0};
     auto curr_time = (current_time - starting_time);
 
+    // reseting cursor position to (0,0)
+    cout << "\033[2J" << "\033[0;0H";
+
     for (auto it = stations.begin(); it != stations.end(); it++) {
         auto station = it->second;
         auto station_number = it->first;
@@ -383,13 +386,16 @@ void log_print(int current_time, int starting_time){
         auto ordinary_queue = station->get_queue("normal");
         auto special_queue = station->get_queue("special");
 
-        cout << "At " << curr_time << " sec, polling station " << station_number << ", elderly/pregnant:";
+        /* if ( station->get_failed() ) { */
+        /*     cout << endl << "At " << curr_time << " sec, polling station " << station_number << " is experiencing a failure" << endl << endl; */
+        /* } */
+        cout << "At " << curr_time << " sec, polling station " << station_number << (station->get_failed() ? " \033[1;31m(station is getting fixed)\033[0m" : "") << ", elderly/pregnant:";
         while(!special_queue.empty()) {
             cout << special_queue.front()->get_ticket_number();
             special_queue.pop();
             if (!special_queue.empty()) cout << ", ";
         }
-        cout << endl << "At " << curr_time << " sec, polling station " << station_number << ", ordinary:";
+        cout << endl << "At " << curr_time << " sec, polling station " << station_number << (station->get_failed() ? " \033[1;31m(station is getting fixed)\033[0m" : "") << ", ordinary:";
         while(!ordinary_queue.empty()) {
             cout << ordinary_queue.front()->get_ticket_number();
             ordinary_queue.pop();
@@ -434,7 +440,7 @@ void* log(void* args_ptr){
             }
         }
 
-        custom::pthread_sleep(T);
+        custom::pthread_sleep(TIME);
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
     }
 
@@ -451,20 +457,19 @@ void* start_station( void* args_ptr ) {
     int station_number;
     float failure_probability;
 
-    auto args      = *(custom::station_args_struct *) args_ptr;
-    sim_time       = args.sim_time;
-    station_number = args.station_number;
+    auto args           = *(custom::station_args_struct *) args_ptr;
+    sim_time            = args.sim_time;
+    station_number      = args.station_number;
     failure_probability = args.failure_probability;
 
     // Simulation timer
-    auto station = stations[ station_number ];
-    auto current_time =  chrono::system_clock::to_time_t(chrono::system_clock::now());
-    auto starting_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    auto end_sim_time =  static_cast<int>(starting_time) + sim_time;
-    auto fail = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto station        = stations[ station_number ];
+    auto current_time   = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto starting_time  = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    auto end_sim_time   = static_cast<int>(starting_time) + sim_time;
+    auto failure_time   = chrono::system_clock::to_time_t(chrono::system_clock::now());
     custom::Voter* voter;
     
-    bool failed = false;
 
     // Wait at the barrier
     pthread_barrier_wait(&barrier);
@@ -473,18 +478,18 @@ void* start_station( void* args_ptr ) {
 
         current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
-        if (current_time - fail >= (10 * T)) {
+        if (current_time - failure_time >= (10 * TIME)) {
             random_device rd;
             mt19937 gen(rd());
             uniform_real_distribution<> dis(0, 1);
 
             double random_number = dis(gen);
-            failed = (0 < failure_probability && random_number <= failure_probability);
+            station->set_failed((0 < failure_probability && random_number <= failure_probability));
 
-            fail = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            failure_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
         }
 
-        if (!failed) {
+        if (!station->get_failed()) {
 
             // checks if there are any voters waiting to vote
             if(station->queue_size("normal") <= 0 && station->queue_size("special") <= 0) {
@@ -523,17 +528,17 @@ void* start_station( void* args_ptr ) {
             auto voter_thread = voter->get_thread();
             pthread_join(voter_thread, NULL);
 
-        } else if (current_time - fail >= (5 * T)) {
+        } else if (current_time - failure_time >= (5 * TIME)) {
 
             custom::log_voter_Data(station->get_station_number(),
                     -1,
                     "mechanic",
-                    fail - sim_starting_time,
+                    failure_time - sim_starting_time,
                     current_time - sim_starting_time,
-                    current_time - fail);
+                    current_time - failure_time);
 
-            failed = false;
-            fail = chrono::system_clock::to_time_t(chrono::system_clock::now());
+            station->set_failed( false );
+            failure_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
         }
     }
