@@ -419,13 +419,16 @@ void* log(void* args_ptr){
 
     auto zero_count = 0;
     
-    current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    if (n > 0) {
+        pthread_barrier_wait(&barrier);
+        current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    }
 
     while(current_time < end_sim_time){
 
         if (current_time - starting_time >= n) {
             log_print(current_time, starting_time);
-            if (zero_count == 0){
+            if (zero_count == 0 && n == 0) {
                 pthread_barrier_wait(&barrier);
                 zero_count++;
             }
